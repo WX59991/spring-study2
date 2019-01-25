@@ -1,21 +1,26 @@
 package com.ns.config;
 
+import java.util.HashSet;
+import java.util.Set;
+
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.PropertySource;
+import org.springframework.data.redis.connection.RedisClusterConfiguration;
 import org.springframework.data.redis.connection.RedisConnectionFactory;
-import org.springframework.data.redis.connection.jedis.JedisClientConfiguration;
+import org.springframework.data.redis.connection.RedisNode;
 import org.springframework.data.redis.connection.jedis.JedisConnectionFactory;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.data.redis.serializer.GenericJackson2JsonRedisSerializer;
 import org.springframework.data.redis.serializer.StringRedisSerializer;
-import com.ns.template.RedisUtil;
+
 import redis.clients.jedis.JedisPoolConfig;
 
 @Configuration
 @PropertySource("classpath:config/redis.properties")
 public class RedisConfig {
+
 
     @Value("${redis.maxIdle}")
     private Integer maxIdle;
@@ -40,6 +45,13 @@ public class RedisConfig {
 
     @Value("${redis.testWhileIdle}")
     private boolean testWhileIdle;
+
+
+    @Value("${spring.redis.cluster.nodes}")
+    private String clusterNodes; 
+
+    @Value("${spring.redis.cluster.max-redirects}")
+    private Integer mmaxRedirectsac;
 
     /**
      * JedisPoolConfig 连接池
@@ -66,42 +78,45 @@ public class RedisConfig {
         jedisPoolConfig.setTestWhileIdle(testWhileIdle);
         return jedisPoolConfig;
     }
-    
-    @Value("${redis.hostName}")
-    private String hostName;
-    
-    @Value("${redis.port}")
-    private Integer port;
-    
-    @Value("${redis.password}")
-    private String password;
-    
-    @Value("${redis.timeout}")
-    private Integer timeout;
-    
     /**
-     * 单机版配置
+     * Redis集群的配置
+    * @return RedisClusterConfiguration
+    * @autor lpl
+    * @date 2017年12月22日
+    * @throws
+     */
+    @Bean
+    public RedisClusterConfiguration redisClusterConfiguration(){
+        RedisClusterConfiguration redisClusterConfiguration = new RedisClusterConfiguration();
+        //Set<RedisNode> clusterNodes
+        String[] serverArray = clusterNodes.split(",");
+
+        Set<RedisNode> nodes = new HashSet<RedisNode>();
+
+        for(String ipPort:serverArray){
+            String[] ipAndPort = ipPort.split(":");
+            nodes.add(new RedisNode(ipAndPort[0].trim(),Integer.valueOf(ipAndPort[1])));
+        }
+
+        redisClusterConfiguration.setClusterNodes(nodes);
+        redisClusterConfiguration.setMaxRedirects(mmaxRedirectsac);
+
+        return redisClusterConfiguration;
+    }
+    /**
+     * 配置工厂
     * @Title: JedisConnectionFactory 
     * @param @param jedisPoolConfig
     * @param @return
     * @return JedisConnectionFactory
     * @autor lpl
-    * @date 2018年2月24日
+    * @date 2017年12月22日
     * @throws
      */
     @Bean
-    public JedisConnectionFactory JedisConnectionFactory(JedisPoolConfig jedisPoolConfig){
-      JedisConnectionFactory JedisConnectionFactory = new JedisConnectionFactory(jedisPoolConfig);
-        //连接池  
-        JedisConnectionFactory.setPoolConfig(jedisPoolConfig);  
-        //IP地址  
-        JedisConnectionFactory.setHostName(hostName);  
-        //端口号  
-        JedisConnectionFactory.setPort(port);  
-        //如果Redis设置有密码  
-        JedisConnectionFactory.setPassword(password);  
-        //客户端超时时间单位是毫秒  
-        JedisConnectionFactory.setTimeout(timeout);  
+    public JedisConnectionFactory JedisConnectionFactory(JedisPoolConfig jedisPoolConfig,RedisClusterConfiguration redisClusterConfiguration){
+        JedisConnectionFactory JedisConnectionFactory = new JedisConnectionFactory(redisClusterConfiguration,jedisPoolConfig);
+        JedisConnectionFactory.setPassword("wangxia");
         return JedisConnectionFactory; 
     }
 
@@ -132,7 +147,6 @@ public class RedisConfig {
         redisTemplate.setEnableTransactionSupport(true);
         redisTemplate.setConnectionFactory(factory);
     }
-
     
 
 }
